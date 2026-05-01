@@ -1,1 +1,1337 @@
-# Fandango-Organic-Reporting
+[fandango-paid-ads-report.html](https://github.com/user-attachments/files/27283247/fandango-paid-ads-report.html)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fandango Paid Ads Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --meta: #cfe2f3;
+    --meta-dark: #6fa8dc;
+    --tiktok: #fce4ec;
+    --tiktok-dark: #e91e63;
+    --snap: #fff9c4;
+    --snap-dark: #fbc02d;
+    --header-bg: #1a1a1a;
+    --row-alt: #f7f7f7;
+    --border: #d0d0d0;
+    --text: #1a1a1a;
+    --muted: #666;
+    --success: #2e7d32;
+    --error: #c62828;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 24px;
+    background: #ececec;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .toolbar {
+    max-width: 1200px;
+    margin: 0 auto 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .toolbar button, .toolbar select {
+    background: #fff;
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+    font-family: inherit;
+  }
+  .toolbar button:hover { background: #f0f0f0; }
+  .toolbar button.primary {
+    background: var(--header-bg);
+    color: #fff;
+    border-color: var(--header-bg);
+  }
+  .toolbar button.primary:hover { background: #333; }
+  .toolbar select { padding: 7px 10px; }
+
+  /* Import zone */
+  .import-section {
+    max-width: 1200px;
+    margin: 0 auto 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 18px 14px;
+    text-align: center;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .drop-zone:hover {
+    border-color: #888;
+    background: #fafafa;
+  }
+  .drop-zone.drag-over {
+    border-color: var(--header-bg);
+    background: #fffbe6;
+    border-style: solid;
+  }
+  .drop-zone.meta { border-top: 4px solid var(--meta-dark); }
+  .drop-zone.tiktok { border-top: 4px solid var(--tiktok-dark); }
+  .drop-zone.snap { border-top: 4px solid var(--snap-dark); }
+
+  .drop-zone .platform-name {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .drop-zone .drop-text {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .drop-zone .drop-status {
+    font-size: 11px;
+    margin-top: 6px;
+    color: var(--success);
+    font-weight: 600;
+    min-height: 14px;
+  }
+  .drop-zone .drop-status.error { color: var(--error); }
+  .drop-zone input[type="file"] { display: none; }
+  .drop-zone .clear-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    display: none;
+  }
+  .drop-zone.has-data .clear-btn { display: block; }
+  .drop-zone .clear-btn:hover { color: var(--error); }
+
+  body:not(.edit-mode) .toolbar,
+  body:not(.edit-mode) .import-section {
+    display: none;
+  }
+  body:not(.edit-mode) .toolbar {
+    display: none;
+  }
+  /* Keep just the view-toggle visible in client view via floating button */
+  .floating-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    background: var(--header-bg);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    display: none;
+  }
+  body:not(.edit-mode) .floating-toggle { display: block; }
+  body:not(.edit-mode) .toolbar { display: flex !important; visibility: hidden; height: 0; margin: 0; padding: 0; overflow: hidden; }
+
+  .report {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    padding: 32px;
+  }
+
+  .header {
+    background: var(--header-bg);
+    color: #fff;
+    text-align: center;
+    padding: 14px;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0 20px;
+    border-bottom: 2px solid var(--header-bg);
+    margin-bottom: 24px;
+  }
+  .meta-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .meta-field label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .meta-field .value {
+    font-size: 14px;
+    padding: 4px 6px;
+    border: 1px dashed transparent;
+    min-height: 22px;
+  }
+  body.edit-mode .meta-field .value {
+    border-color: var(--border);
+    background: #fffdf5;
+  }
+
+  h2.section-title {
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 32px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--header-bg);
+  }
+
+  /* Platform Summary Cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .summary-card {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .summary-card .card-header {
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+  }
+  .summary-card.meta .card-header { background: var(--meta); }
+  .summary-card.tiktok .card-header { background: var(--tiktok); }
+  .summary-card.snap .card-header { background: var(--snap); }
+
+  .summary-card table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .summary-card td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #eee;
+  }
+  .summary-card td:first-child {
+    color: var(--muted);
+    width: 55%;
+  }
+  .summary-card td:last-child {
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary-card tr:last-child td { border-bottom: none; }
+
+  /* Top 5 tables */
+  .platform-section { margin-bottom: 28px; }
+
+  table.creative-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+    border: 1px solid var(--border);
+    table-layout: auto;
+  }
+  table.creative-table th {
+    background: var(--header-bg);
+    color: #fff;
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    border-right: 1px solid #333;
+    white-space: nowrap;
+  }
+  table.creative-table th:last-child { border-right: none; }
+  table.creative-table td {
+    padding: 7px 6px;
+    border-bottom: 1px solid #e5e5e5;
+    border-right: 1px solid #eee;
+    vertical-align: middle;
+  }
+  table.creative-table td:last-child { border-right: none; }
+  table.creative-table tr:nth-child(even) td { background: var(--row-alt); }
+
+  table.creative-table .platform-cell {
+    font-weight: 600;
+    text-align: center;
+    width: 70px;
+  }
+  table.creative-table.meta .platform-cell { background: var(--meta) !important; }
+  table.creative-table.tiktok .platform-cell { background: var(--tiktok) !important; }
+  table.creative-table.snap .platform-cell { background: var(--snap) !important; }
+
+  /* Highlight the column matching the selected "Rank Top 5 by" metric (Fandango orange tint) */
+  table.creative-table[data-highlight="reach"] td:nth-child(5),
+  table.creative-table[data-highlight="impressions"] td:nth-child(6),
+  table.creative-table[data-highlight="conversions"] td:nth-child(8),
+  table.creative-table[data-highlight="spend"] td:nth-child(9),
+  table.creative-table[data-highlight="ctr"] td:nth-child(12),
+  table.creative-table[data-highlight="clicks"] td:nth-child(13) {
+    background-color: rgba(255, 115, 0, 0.18) !important;
+  }
+  table.creative-table[data-highlight="reach"] th:nth-child(5),
+  table.creative-table[data-highlight="impressions"] th:nth-child(6),
+  table.creative-table[data-highlight="conversions"] th:nth-child(8),
+  table.creative-table[data-highlight="spend"] th:nth-child(9),
+  table.creative-table[data-highlight="ctr"] th:nth-child(12),
+  table.creative-table[data-highlight="clicks"] th:nth-child(13) {
+    background-color: #c14d00 !important;
+  }
+
+  .asset-link {
+    color: #1565c0;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Editable styling */
+  [contenteditable="true"] { outline: none; }
+  body.edit-mode [contenteditable="true"]:hover { background: #fffbe6 !important; }
+  body.edit-mode [contenteditable="true"]:focus {
+    background: #fff3a3 !important;
+    box-shadow: inset 0 0 0 1px var(--snap-dark);
+  }
+
+  .row-actions {
+    display: none;
+    width: 50px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  body.edit-mode .row-actions { display: table-cell; }
+  body.edit-mode th.row-actions-th { display: table-cell; }
+  th.row-actions-th { display: none; }
+
+  .row-actions button {
+    background: #fff;
+    border: 1px solid var(--border);
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+    margin: 0 1px;
+  }
+  .row-actions button:hover { background: #ffe0e0; }
+
+  .add-row-btn {
+    display: none;
+    margin-top: 6px;
+    background: #fff;
+    border: 1px dashed var(--border);
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  body.edit-mode .add-row-btn { display: inline-block; }
+  .add-row-btn:hover { background: #f0f0f0; }
+
+  .format-select {
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    padding: 2px;
+  }
+  body:not(.edit-mode) .format-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: none;
+    pointer-events: none;
+  }
+
+  .footnote {
+    margin-top: 24px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* Mapping modal */
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-backdrop.active { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 6px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .modal h3 { margin-top: 0; }
+  .modal .mapping-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .modal .mapping-row label {
+    flex: 0 0 130px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .modal .mapping-row select {
+    flex: 1;
+    padding: 5px;
+    font-size: 12px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+
+  /* Print */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .toolbar, .import-section, .floating-toggle { display: none !important; }
+    .report { box-shadow: none; padding: 16px; max-width: 100%; }
+    .add-row-btn, .row-actions, th.row-actions-th { display: none !important; }
+    table.creative-table { font-size: 10px; }
+    table.creative-table th, table.creative-table td { padding: 5px 4px; }
+    h2.section-title { page-break-after: avoid; }
+    .platform-section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body class="edit-mode">
+
+<div class="toolbar">
+  <button id="toggleMode" class="primary">👁 Switch to Client View</button>
+  <button onclick="window.print()">🖨 Print / Save as PDF</button>
+  <label style="font-size:12px; color:#444; margin-left:8px;">Rank Top 5 by:
+    <select id="sortMetric">
+      <option value="conversions">Conversions</option>
+      <option value="reach">Reach</option>
+      <option value="impressions">Impressions</option>
+      <option value="clicks">Clicks (all)</option>
+      <option value="ctr">CTR (all)</option>
+      <option value="spend">Amount Spent</option>
+    </select>
+  </label>
+  <button id="resetBtn">↺ Reset Template</button>
+  <span style="margin-left:auto; color:#666; font-size:12px;">Drop CSVs below or click any cell to edit manually.</span>
+</div>
+
+<button id="floatingToggle" class="floating-toggle">✎ Switch to Edit Mode</button>
+
+<div class="import-section">
+  <div class="drop-zone meta" data-platform="meta">
+    <button class="clear-btn" title="Clear data" data-clear="meta">✕</button>
+    <div class="platform-name">📘 Meta</div>
+    <div class="drop-text">Drop CSV here or click to browse</div>
+    <div class="drop-status" data-status="meta"></div>
+    <input type="file" accept=".csv" data-input="meta">
+  </div>
+  <div class="drop-zone tiktok" data-platform="tiktok">
+    <button class="clear-btn" title="Clear data" data-clear="tiktok">✕</button>
+    <div class="platform-name">🎵 TikTok</div>
+    <div class="drop-text">Drop CSV here or click to browse</div>
+    <div class="drop-status" data-status="tiktok"></div>
+    <input type="file" accept=".csv" data-input="tiktok">
+  </div>
+  <div class="drop-zone snap" data-platform="snap">
+    <button class="clear-btn" title="Clear data" data-clear="snap">✕</button>
+    <div class="platform-name">👻 Snapchat</div>
+    <div class="drop-text">Drop CSV here or click to browse</div>
+    <div class="drop-status" data-status="snap"></div>
+    <input type="file" accept=".csv" data-input="snap">
+  </div>
+</div>
+
+<div class="report" id="report">
+
+  <div class="header">FANDANGO — PAID MEDIA PERFORMANCE REPORT</div>
+
+  <div class="meta-row">
+    <div class="meta-field">
+      <label>Reporting Period</label>
+      <div class="value" contenteditable="true" data-key="period">Month DD, YYYY – Month DD, YYYY</div>
+    </div>
+    <div class="meta-field">
+      <label>Prepared By</label>
+      <div class="value" contenteditable="true" data-key="preparedBy">Jesse Cameron</div>
+    </div>
+    <div class="meta-field">
+      <label>Notes</label>
+      <div class="value" contenteditable="true" data-key="notes">Add campaign context, learnings, or callouts here.</div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Platform Performance Summary</h2>
+  <div class="summary-grid">
+    <div class="summary-card meta">
+      <div class="card-header">META</div>
+      <table>
+        <tr><td>Reach</td><td contenteditable="true" data-platform="meta" data-kpi="reach">0</td></tr>
+        <tr><td>Impressions</td><td contenteditable="true" data-platform="meta" data-kpi="impressions">0</td></tr>
+        <tr><td>Frequency</td><td contenteditable="true" data-platform="meta" data-kpi="frequency">0.00</td></tr>
+        <tr><td>Conversions</td><td contenteditable="true" data-platform="meta" data-kpi="conversions">0</td></tr>
+        <tr><td>Amount Spent (USD)</td><td contenteditable="true" data-platform="meta" data-kpi="spend">$0.00</td></tr>
+        <tr><td>Cost per Result</td><td contenteditable="true" data-platform="meta" data-kpi="cpr">$0.00</td></tr>
+        <tr><td>CPM</td><td contenteditable="true" data-platform="meta" data-kpi="cpm">$0.00</td></tr>
+        <tr><td>CTR (all)</td><td contenteditable="true" data-platform="meta" data-kpi="ctr">0.00%</td></tr>
+        <tr><td>Clicks (all)</td><td contenteditable="true" data-platform="meta" data-kpi="clicks">0</td></tr>
+      </table>
+    </div>
+
+    <div class="summary-card tiktok">
+      <div class="card-header">TIKTOK</div>
+      <table>
+        <tr><td>Reach</td><td contenteditable="true" data-platform="tiktok" data-kpi="reach">0</td></tr>
+        <tr><td>Impressions</td><td contenteditable="true" data-platform="tiktok" data-kpi="impressions">0</td></tr>
+        <tr><td>Frequency</td><td contenteditable="true" data-platform="tiktok" data-kpi="frequency">0.00</td></tr>
+        <tr><td>Conversions</td><td contenteditable="true" data-platform="tiktok" data-kpi="conversions">0</td></tr>
+        <tr><td>Amount Spent (USD)</td><td contenteditable="true" data-platform="tiktok" data-kpi="spend">$0.00</td></tr>
+        <tr><td>Cost per Result</td><td contenteditable="true" data-platform="tiktok" data-kpi="cpr">$0.00</td></tr>
+        <tr><td>CPM</td><td contenteditable="true" data-platform="tiktok" data-kpi="cpm">$0.00</td></tr>
+        <tr><td>CTR (all)</td><td contenteditable="true" data-platform="tiktok" data-kpi="ctr">0.00%</td></tr>
+        <tr><td>Clicks (all)</td><td contenteditable="true" data-platform="tiktok" data-kpi="clicks">0</td></tr>
+      </table>
+    </div>
+
+    <div class="summary-card snap">
+      <div class="card-header">SNAPCHAT</div>
+      <table>
+        <tr><td>Reach</td><td contenteditable="true" data-platform="snap" data-kpi="reach">0</td></tr>
+        <tr><td>Impressions</td><td contenteditable="true" data-platform="snap" data-kpi="impressions">0</td></tr>
+        <tr><td>Frequency</td><td contenteditable="true" data-platform="snap" data-kpi="frequency">0.00</td></tr>
+        <tr><td>Conversions</td><td contenteditable="true" data-platform="snap" data-kpi="conversions">0</td></tr>
+        <tr><td>Amount Spent (USD)</td><td contenteditable="true" data-platform="snap" data-kpi="spend">$0.00</td></tr>
+        <tr><td>Cost per Result</td><td contenteditable="true" data-platform="snap" data-kpi="cpr">$0.00</td></tr>
+        <tr><td>CPM</td><td contenteditable="true" data-platform="snap" data-kpi="cpm">$0.00</td></tr>
+        <tr><td>CTR (all)</td><td contenteditable="true" data-platform="snap" data-kpi="ctr">0.00%</td></tr>
+        <tr><td>Clicks (all)</td><td contenteditable="true" data-platform="snap" data-kpi="clicks">0</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2 class="section-title">Top 5 Creative Assets — Meta</h2>
+  <div class="platform-section">
+    <table class="creative-table meta" data-platform="meta">
+      <thead>
+        <tr>
+          <th>Platform</th>
+          <th>Asset Name</th>
+          <th>Movie</th>
+          <th>Format</th>
+          <th class="num">Reach</th>
+          <th class="num">Impressions</th>
+          <th class="num">Freq.</th>
+          <th class="num">Conv.</th>
+          <th class="num">Spend</th>
+          <th class="num">CPR</th>
+          <th class="num">CPM</th>
+          <th class="num">CTR</th>
+          <th class="num">Clicks</th>
+          <th class="row-actions-th">Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button class="add-row-btn" data-platform="meta">+ Add Row</button>
+  </div>
+
+  <h2 class="section-title">Top 5 Creative Assets — TikTok</h2>
+  <div class="platform-section">
+    <table class="creative-table tiktok" data-platform="tiktok">
+      <thead>
+        <tr>
+          <th>Platform</th>
+          <th>Asset Name</th>
+          <th>Movie</th>
+          <th>Format</th>
+          <th class="num">Reach</th>
+          <th class="num">Impressions</th>
+          <th class="num">Freq.</th>
+          <th class="num">Conv.</th>
+          <th class="num">Spend</th>
+          <th class="num">CPR</th>
+          <th class="num">CPM</th>
+          <th class="num">CTR</th>
+          <th class="num">Clicks</th>
+          <th class="row-actions-th">Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button class="add-row-btn" data-platform="tiktok">+ Add Row</button>
+  </div>
+
+  <h2 class="section-title">Top 5 Creative Assets — Snapchat</h2>
+  <div class="platform-section">
+    <table class="creative-table snap" data-platform="snap">
+      <thead>
+        <tr>
+          <th>Platform</th>
+          <th>Asset Name</th>
+          <th>Movie</th>
+          <th>Format</th>
+          <th class="num">Reach</th>
+          <th class="num">Impressions</th>
+          <th class="num">Freq.</th>
+          <th class="num">Conv.</th>
+          <th class="num">Spend</th>
+          <th class="num">CPR</th>
+          <th class="num">CPM</th>
+          <th class="num">CTR</th>
+          <th class="num">Clicks</th>
+          <th class="row-actions-th">Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button class="add-row-btn" data-platform="snap">+ Add Row</button>
+  </div>
+
+  <div class="footnote">Fandango Paid Media Performance Report · Generated with Claude</div>
+</div>
+
+<!-- Generic confirm/prompt dialog (native window.confirm/prompt are blocked in sandboxed iframes) -->
+<div class="modal-backdrop" id="dialogModal">
+  <div class="modal" style="max-width:420px;">
+    <p id="dialogMessage" style="margin:0 0 14px; font-size:14px; line-height:1.5;"></p>
+    <input type="text" id="dialogInput" style="width:100%; padding:8px 10px; font-size:13px; border:1px solid var(--border); border-radius:4px; font-family:inherit; display:none; box-sizing:border-box;">
+    <div class="modal-actions">
+      <button id="dialogCancel">Cancel</button>
+      <button id="dialogConfirm" class="primary" style="background:#1a1a1a; color:#fff; border-color:#1a1a1a;">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Column mapping modal -->
+<div class="modal-backdrop" id="mappingModal">
+  <div class="modal">
+    <h3 id="mappingTitle">Map CSV Columns</h3>
+    <p style="font-size:12px; color:#666;">We auto-detected columns. Confirm or adjust the mapping below. Choose "— None —" to skip a field.</p>
+    <div id="mappingFields"></div>
+    <div class="modal-actions">
+      <button id="mappingCancel">Cancel</button>
+      <button id="mappingConfirm" class="primary" style="background:#1a1a1a;color:#fff;">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PLATFORM_LABELS = { meta: 'Meta', tiktok: 'TikTok', snap: 'Snapchat' };
+
+// ---------- Custom dialogs (window.confirm/prompt are blocked in sandboxed iframes) ----------
+function showDialog(opts) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('dialogModal');
+    const msg = document.getElementById('dialogMessage');
+    const input = document.getElementById('dialogInput');
+    const okBtn = document.getElementById('dialogConfirm');
+    const cancelBtn = document.getElementById('dialogCancel');
+
+    msg.textContent = opts.message || '';
+    if (opts.input) {
+      input.style.display = 'block';
+      input.value = opts.defaultValue || '';
+      setTimeout(() => { input.focus(); input.select(); }, 60);
+    } else {
+      input.style.display = 'none';
+    }
+    okBtn.textContent = opts.okText || 'OK';
+    cancelBtn.textContent = opts.cancelText || 'Cancel';
+    modal.classList.add('active');
+
+    const done = (val) => {
+      modal.classList.remove('active');
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      input.onkeydown = null;
+      resolve(val);
+    };
+    okBtn.onclick = () => done(opts.input ? input.value : true);
+    cancelBtn.onclick = () => done(opts.input ? null : false);
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
+    };
+  });
+}
+const customConfirm = (msg) => showDialog({ message: msg });
+const customPrompt = (msg, def = '') => showDialog({ message: msg, input: true, defaultValue: def });
+
+// ---------- State ----------
+const blankRow = () => ({
+  assetName: '', assetLink: '', movie: '', format: 'Video',
+  reach: '', impressions: '', frequency: '', conversions: '',
+  spend: '', cpr: '', cpm: '', ctr: '', clicks: ''
+});
+
+function defaultState() {
+  return {
+    meta: {
+      period: 'Month DD, YYYY – Month DD, YYYY',
+      preparedBy: 'Jesse Cameron',
+      notes: 'Add campaign context, learnings, or callouts here.'
+    },
+    summary: {
+      meta: { reach:'0', impressions:'0', frequency:'0.00', conversions:'0', spend:'$0.00', cpr:'$0.00', cpm:'$0.00', ctr:'0.00%', clicks:'0' },
+      tiktok: { reach:'0', impressions:'0', frequency:'0.00', conversions:'0', spend:'$0.00', cpr:'$0.00', cpm:'$0.00', ctr:'0.00%', clicks:'0' },
+      snap: { reach:'0', impressions:'0', frequency:'0.00', conversions:'0', spend:'$0.00', cpr:'$0.00', cpm:'$0.00', ctr:'0.00%', clicks:'0' }
+    },
+    rows: {
+      meta: Array.from({length:5}, blankRow),
+      tiktok: Array.from({length:5}, blankRow),
+      snap: Array.from({length:5}, blankRow)
+    },
+    rawData: { meta: null, tiktok: null, snap: null },
+    sortMetric: 'conversions'
+  };
+}
+
+let state = defaultState();
+
+// ---------- Header normalization & field mapping ----------
+function normHeader(h) {
+  return String(h || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/[_\-]/g, ' ');
+}
+
+// Possible header variations per logical field, ordered by preference
+const HEADER_ALIASES = {
+  assetName: ['ad name', 'creative name', 'asset name', 'video name'],
+  movie: ['ad name', 'creative name', 'campaign name', 'campaign', 'ad set name', 'adgroup name', 'ad group name', 'product name'],
+  reach: ['reach', 'unique reach', 'unique users'],
+  impressions: ['impressions', 'impression', 'paid impressions'],
+  frequency: ['frequency', 'avg. impression frequency', 'average frequency'],
+  conversions: [
+    'results', 'result', 'conversions', 'total conversions', 'website purchases',
+    'purchases', 'leads', 'website leads', 'on-facebook leads', 'website conversions',
+    'total complete payment', 'total result'
+  ],
+  spend: [
+    'amount spent (usd)', 'amount spent', 'spend', 'cost', 'total cost',
+    'total spent', 'amount spent (us dollar)'
+  ],
+  cpr: [
+    'cost per result', 'cost per results', 'cost per conversion',
+    'cost per total conversion', 'cost per purchase', 'cost per lead'
+  ],
+  cpm: ['cpm (cost per 1,000 impressions)', 'cpm', 'cost per 1000 impressions', 'ecpm', 'ecpm (cost per 1,000 impressions)'],
+  ctr: [
+    'ctr (all)', 'ctr', 'click through rate (ctr)', 'click-through rate (ctr)',
+    'ctr (link click-through rate)', 'click-through rate', 'swipe up rate'
+  ],
+  clicks: ['clicks (all)', 'clicks', 'link clicks', 'clicks (destination)', 'swipe ups'],
+  format: ['creative type', 'ad format', 'format', 'video / image'],
+  assetLink: ['ad preview link', 'preview link', 'video url', 'creative url', 'permalink', 'preview url']
+};
+
+function autoMap(headers) {
+  const normalized = headers.map(h => ({ raw: h, norm: normHeader(h) }));
+  const map = {};
+  for (const field of Object.keys(HEADER_ALIASES)) {
+    for (const alias of HEADER_ALIASES[field]) {
+      const found = normalized.find(h => h.norm === alias);
+      if (found) { map[field] = found.raw; break; }
+    }
+    // partial match fallback for the most common ones
+    if (!map[field]) {
+      for (const alias of HEADER_ALIASES[field]) {
+        const found = normalized.find(h => h.norm.includes(alias) || alias.includes(h.norm));
+        if (found && found.norm.length > 2) { map[field] = found.raw; break; }
+      }
+    }
+  }
+  return map;
+}
+
+// ---------- Number parsing ----------
+function parseNum(val) {
+  if (val === null || val === undefined || val === '') return NaN;
+  const cleaned = String(val).replace(/[$,%\s]/g, '').replace(/[^\d.\-eE]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? NaN : n;
+}
+
+// ---------- Formatters ----------
+function fmtInt(n) {
+  if (!isFinite(n)) return '0';
+  return Math.round(n).toLocaleString('en-US');
+}
+function fmtCurrency(n) {
+  if (!isFinite(n)) return '$0.00';
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtFreq(n) {
+  if (!isFinite(n)) return '0.00';
+  return n.toFixed(2);
+}
+function fmtPct(n) {
+  if (!isFinite(n)) return '0.00%';
+  return n.toFixed(2) + '%';
+}
+
+// ---------- CSV ingestion ----------
+function ingestCSV(platform, file) {
+  const statusEl = document.querySelector(`[data-status="${platform}"]`);
+  statusEl.classList.remove('error');
+  statusEl.textContent = 'Parsing...';
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: 'greedy',
+    dynamicTyping: false,
+    transformHeader: h => h ? h.trim() : h,
+    complete: (results) => {
+      try {
+        const rawRows = results.data.filter(r => r && Object.values(r).some(v => v !== '' && v !== null));
+        if (!rawRows.length) {
+          statusEl.classList.add('error');
+          statusEl.textContent = 'No data rows found';
+          return;
+        }
+        const headers = results.meta.fields || Object.keys(rawRows[0]);
+        const mapping = autoMap(headers);
+
+        // Show mapping modal for confirmation
+        showMappingModal(platform, headers, mapping, rawRows);
+      } catch (err) {
+        statusEl.classList.add('error');
+        statusEl.textContent = 'Error: ' + err.message;
+      }
+    },
+    error: (err) => {
+      statusEl.classList.add('error');
+      statusEl.textContent = 'Parse error: ' + err.message;
+    }
+  });
+}
+
+// ---------- Mapping confirmation modal ----------
+function showMappingModal(platform, headers, mapping, rawRows) {
+  const modal = document.getElementById('mappingModal');
+  const fieldsContainer = document.getElementById('mappingFields');
+  document.getElementById('mappingTitle').textContent = `Map ${PLATFORM_LABELS[platform]} CSV Columns`;
+  fieldsContainer.innerHTML = '';
+
+  const fieldLabels = {
+    assetName: 'Asset Name *',
+    movie: 'Movie',
+    reach: 'Reach',
+    impressions: 'Impressions',
+    frequency: 'Frequency',
+    conversions: 'Conversions',
+    spend: 'Amount Spent',
+    cpr: 'Cost per Result',
+    cpm: 'CPM',
+    ctr: 'CTR',
+    clicks: 'Clicks',
+    format: 'Format (optional)',
+    assetLink: 'Asset Link (optional)'
+  };
+
+  for (const field of Object.keys(fieldLabels)) {
+    const row = document.createElement('div');
+    row.className = 'mapping-row';
+    const label = document.createElement('label');
+    label.textContent = fieldLabels[field];
+    const select = document.createElement('select');
+    select.dataset.field = field;
+    select.innerHTML = `<option value="">— None —</option>` +
+      headers.map(h => `<option value="${escapeAttr(h)}" ${mapping[field] === h ? 'selected' : ''}>${escapeHtml(h)}</option>`).join('');
+    row.appendChild(label);
+    row.appendChild(select);
+    fieldsContainer.appendChild(row);
+  }
+
+  modal.classList.add('active');
+
+  document.getElementById('mappingConfirm').onclick = () => {
+    const newMapping = {};
+    fieldsContainer.querySelectorAll('select').forEach(s => {
+      if (s.value) newMapping[s.dataset.field] = s.value;
+    });
+    modal.classList.remove('active');
+    applyCSVData(platform, rawRows, newMapping);
+  };
+  document.getElementById('mappingCancel').onclick = () => {
+    modal.classList.remove('active');
+    document.querySelector(`[data-status="${platform}"]`).textContent = '';
+  };
+}
+
+// ---------- Helpers for asset name parsing & consolidation ----------
+function deriveDisplayName(fullName) {
+  if (!fullName || !fullName.includes('~')) return fullName;
+  const parts = fullName.split('~').map(p => p.trim()).filter(Boolean);
+  // Marker segment is "Organic" (Meta/TikTok) or "Brand" (Snapchat)
+  const markerIdx = parts.findIndex(p => /^(organic|brand)$/i.test(p));
+  if (markerIdx === -1) return fullName;
+  let descParts = parts.slice(markerIdx + 1);
+  // Drop trailing date-like segment (e.g., "3.12.2026", "12/3/2026", "2026-3-12")
+  if (descParts.length > 0 && /^\d{1,4}[.\/\-]\d{1,2}[.\/\-]\d{1,4}$/.test(descParts[descParts.length - 1])) {
+    descParts = descParts.slice(0, -1);
+  }
+  if (descParts.length === 0) return fullName;
+  return descParts.join(' ');
+}
+
+function consolidateByName(rows) {
+  const groups = new Map();
+  const sumKeys = ['_reach','_impressions','_conversions','_spend','_clicks'];
+  for (const r of rows) {
+    const key = (r._originalName || r.assetName || '').trim();
+    if (!key) {
+      // Don't lump blank-named rows together
+      groups.set(Symbol(), { ...r });
+      continue;
+    }
+    if (!groups.has(key)) {
+      const seed = { ...r };
+      sumKeys.forEach(k => { if (!isFinite(seed[k])) seed[k] = 0; });
+      groups.set(key, seed);
+    } else {
+      const g = groups.get(key);
+      sumKeys.forEach(k => {
+        const v = isFinite(r[k]) ? r[k] : 0;
+        g[k] = (isFinite(g[k]) ? g[k] : 0) + v;
+      });
+      // Backfill any missing metadata from later rows
+      if (!g.assetLink && r.assetLink) g.assetLink = r.assetLink;
+      if (!g.movie && r.movie) g.movie = r.movie;
+      if (!g.format && r.format) g.format = r.format;
+    }
+  }
+  // Recalculate derived metrics from the summed totals
+  const result = Array.from(groups.values());
+  result.forEach(g => {
+    g._frequency = g._reach > 0 ? g._impressions / g._reach : NaN;
+    g._cpr = g._conversions > 0 ? g._spend / g._conversions : NaN;
+    g._cpm = g._impressions > 0 ? (g._spend / g._impressions) * 1000 : NaN;
+    g._ctr = g._impressions > 0 ? (g._clicks / g._impressions) * 100 : NaN;
+  });
+  return result;
+}
+
+// ---------- Apply parsed data ----------
+function applyCSVData(platform, rawRows, mapping) {
+  const statusEl = document.querySelector(`[data-status="${platform}"]`);
+  const dropZone = document.querySelector(`.drop-zone[data-platform="${platform}"]`);
+
+  // Map all rows into normalized objects (then dedup + truncate)
+  let mappedRows = rawRows.map(r => {
+    const out = blankRow();
+    for (const field of Object.keys(mapping)) {
+      const raw = r[mapping[field]];
+      if (raw === undefined || raw === null) continue;
+      out[field] = String(raw).trim();
+    }
+    // Numeric versions for sorting/aggregation
+    out._reach = parseNum(out.reach);
+    out._impressions = parseNum(out.impressions);
+    out._frequency = parseNum(out.frequency);
+    out._conversions = parseNum(out.conversions);
+    out._spend = parseNum(out.spend);
+    out._cpr = parseNum(out.cpr);
+    out._cpm = parseNum(out.cpm);
+    out._ctr = parseNum(out.ctr);
+    out._clicks = parseNum(out.clicks);
+
+    // Structured ad name parsing (applies to all platforms)
+    // Convention: "{Movie}~{Format}~...~{Date}" e.g., "DWP2~Video~Organic~Mix~4.24.2026"
+    // First segment = Movie; any subsequent segment containing video/image/static/carousel/gif = Format
+    if (out.assetName && out.assetName.includes('~')) {
+      const parts = out.assetName.split('~').map(p => p.trim()).filter(Boolean);
+      if (parts.length > 0) out.movie = parts[0];
+      let detected = null;
+      for (const part of parts.slice(1)) {
+        const m = part.match(/(video|image|static|carousel|gif)/i);
+        if (m) { detected = m[1].toLowerCase(); break; }
+      }
+      if (detected) {
+        out.format = detected === 'gif' ? 'GIF' : (detected.charAt(0).toUpperCase() + detected.slice(1));
+      }
+    }
+
+    // Format guess fallback (if not already a clean value)
+    if (!out.format) out.format = 'Video';
+    else if (!/^(Video|Image|Static|Carousel|GIF)$/.test(out.format)) {
+      if (/image|static|photo|jpg|jpeg|png/i.test(out.format)) out.format = 'Image';
+      else if (/carousel/i.test(out.format)) out.format = 'Carousel';
+      else if (/gif/i.test(out.format)) out.format = 'GIF';
+      else if (/video|mp4|mov/i.test(out.format)) out.format = 'Video';
+      else out.format = 'Video';
+    }
+
+    // Preserve full original ad name for dedup grouping
+    out._originalName = out.assetName;
+
+    return out;
+  });
+
+  // Filter out ads without a recognized organic marker (Organic for Meta/TikTok, Brand for Snapchat)
+  const beforeFilter = mappedRows.length;
+  mappedRows = mappedRows.filter(r => {
+    const name = r._originalName || '';
+    if (!name.includes('~')) return false;
+    return name.split('~').some(p => /^(organic|brand)$/i.test(p.trim()));
+  });
+  const excludedCount = beforeFilter - mappedRows.length;
+
+  // Consolidate identical asset names (sum metrics, recalc derived rates)
+  mappedRows = consolidateByName(mappedRows);
+
+  // Truncate asset name for display: take what's between "Organic" and the date
+  mappedRows.forEach(r => {
+    const display = deriveDisplayName(r._originalName);
+    if (display) r.assetName = display;
+  });
+
+  // Aggregate platform totals
+  const totals = mappedRows.reduce((acc, r) => {
+    acc.reach += isFinite(r._reach) ? r._reach : 0;
+    acc.impressions += isFinite(r._impressions) ? r._impressions : 0;
+    acc.conversions += isFinite(r._conversions) ? r._conversions : 0;
+    acc.spend += isFinite(r._spend) ? r._spend : 0;
+    acc.clicks += isFinite(r._clicks) ? r._clicks : 0;
+    return acc;
+  }, { reach:0, impressions:0, conversions:0, spend:0, clicks:0 });
+
+  state.summary[platform] = {
+    reach: fmtInt(totals.reach),
+    impressions: fmtInt(totals.impressions),
+    frequency: fmtFreq(totals.reach > 0 ? totals.impressions / totals.reach : 0),
+    conversions: fmtInt(totals.conversions),
+    spend: fmtCurrency(totals.spend),
+    cpr: fmtCurrency(totals.conversions > 0 ? totals.spend / totals.conversions : 0),
+    cpm: fmtCurrency(totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0),
+    ctr: fmtPct(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0),
+    clicks: fmtInt(totals.clicks)
+  };
+
+  // Store raw data so we can re-sort by metric without re-parsing
+  state.rawData[platform] = mappedRows;
+
+  // Pick top 5 by sort metric
+  rebuildTopFive(platform);
+
+  dropZone.classList.add('has-data');
+  statusEl.classList.remove('error');
+  const excludedNote = excludedCount > 0 ? ` · ${excludedCount} non-organic excluded` : '';
+  statusEl.textContent = `✓ ${mappedRows.length} ad${mappedRows.length===1?'':'s'} loaded${excludedNote}`;
+  renderAll();
+}
+
+function rebuildTopFive(platform) {
+  const data = state.rawData[platform];
+  if (!data) return;
+  const metric = state.sortMetric;
+  const metricKey = '_' + metric;
+  const sorted = [...data].sort((a, b) => {
+    const av = isFinite(a[metricKey]) ? a[metricKey] : -Infinity;
+    const bv = isFinite(b[metricKey]) ? b[metricKey] : -Infinity;
+    return bv - av;
+  });
+  const top5 = sorted.slice(0, 5).map(r => ({
+    assetName: r.assetName || 'Untitled',
+    assetLink: r.assetLink || '',
+    movie: r.movie || '',
+    format: r.format || 'Video',
+    reach: isFinite(r._reach) ? fmtInt(r._reach) : (r.reach || ''),
+    impressions: isFinite(r._impressions) ? fmtInt(r._impressions) : (r.impressions || ''),
+    frequency: isFinite(r._frequency) ? fmtFreq(r._frequency) : (r.frequency || ''),
+    conversions: isFinite(r._conversions) ? fmtInt(r._conversions) : (r.conversions || ''),
+    spend: isFinite(r._spend) ? fmtCurrency(r._spend) : (r.spend || ''),
+    cpr: isFinite(r._cpr) ? fmtCurrency(r._cpr) : (r.cpr || ''),
+    cpm: isFinite(r._cpm) ? fmtCurrency(r._cpm) : (r.cpm || ''),
+    ctr: isFinite(r._ctr) ? fmtPct(r._ctr) : (r.ctr || ''),
+    clicks: isFinite(r._clicks) ? fmtInt(r._clicks) : (r.clicks || '')
+  }));
+  // pad to 5
+  while (top5.length < 5) top5.push(blankRow());
+  state.rows[platform] = top5;
+}
+
+function clearPlatform(platform) {
+  state.rawData[platform] = null;
+  state.rows[platform] = Array.from({length:5}, blankRow);
+  state.summary[platform] = {
+    reach:'0', impressions:'0', frequency:'0.00', conversions:'0',
+    spend:'$0.00', cpr:'$0.00', cpm:'$0.00', ctr:'0.00%', clicks:'0'
+  };
+  document.querySelector(`.drop-zone[data-platform="${platform}"]`).classList.remove('has-data');
+  document.querySelector(`[data-status="${platform}"]`).textContent = '';
+  document.querySelector(`input[data-input="${platform}"]`).value = '';
+  renderAll();
+}
+
+// ---------- Render ----------
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(str) { return escapeHtml(str); }
+
+function renderRows(platform) {
+  const tbody = document.querySelector(`table.creative-table[data-platform="${platform}"] tbody`);
+  tbody.innerHTML = '';
+  state.rows[platform].forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+    const linkDisplay = row.assetLink
+      ? `<a href="${escapeAttr(row.assetLink)}" class="asset-link" contenteditable="false">${escapeHtml(row.assetName || 'Untitled')}</a>`
+      : `<span contenteditable="true" data-field="assetName">${escapeHtml(row.assetName)}</span>`;
+
+    tr.innerHTML = `
+      <td class="platform-cell">${PLATFORM_LABELS[platform]}</td>
+      <td class="asset-cell">${linkDisplay}</td>
+      <td contenteditable="true" data-field="movie">${escapeHtml(row.movie)}</td>
+      <td>
+        <select class="format-select" data-field="format">
+          <option ${row.format==='Video'?'selected':''}>Video</option>
+          <option ${row.format==='Image'?'selected':''}>Image</option>
+          <option ${row.format==='Static'?'selected':''}>Static</option>
+          <option ${row.format==='Carousel'?'selected':''}>Carousel</option>
+          <option ${row.format==='GIF'?'selected':''}>GIF</option>
+        </select>
+      </td>
+      <td class="num" contenteditable="true" data-field="reach">${escapeHtml(row.reach)}</td>
+      <td class="num" contenteditable="true" data-field="impressions">${escapeHtml(row.impressions)}</td>
+      <td class="num" contenteditable="true" data-field="frequency">${escapeHtml(row.frequency)}</td>
+      <td class="num" contenteditable="true" data-field="conversions">${escapeHtml(row.conversions)}</td>
+      <td class="num" contenteditable="true" data-field="spend">${escapeHtml(row.spend)}</td>
+      <td class="num" contenteditable="true" data-field="cpr">${escapeHtml(row.cpr)}</td>
+      <td class="num" contenteditable="true" data-field="cpm">${escapeHtml(row.cpm)}</td>
+      <td class="num" contenteditable="true" data-field="ctr">${escapeHtml(row.ctr)}</td>
+      <td class="num" contenteditable="true" data-field="clicks">${escapeHtml(row.clicks)}</td>
+      <td class="row-actions">
+        <button title="Edit link" onclick="editLink('${platform}', ${idx})">🔗</button>
+        <button title="Edit name" onclick="editName('${platform}', ${idx})">✎</button>
+        <button title="Delete row" onclick="deleteRow('${platform}', ${idx})">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderAll() {
+  document.querySelectorAll('.meta-field .value').forEach(el => {
+    el.textContent = state.meta[el.dataset.key] || '';
+  });
+  document.querySelectorAll('.summary-card td[data-platform]').forEach(td => {
+    td.textContent = state.summary[td.dataset.platform][td.dataset.kpi] || '';
+  });
+  ['meta','tiktok','snap'].forEach(renderRows);
+}
+
+// ---------- Manual edit handlers ----------
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.matches('.meta-field .value')) { state.meta[t.dataset.key] = t.textContent; return; }
+  if (t.matches('.summary-card td[contenteditable]')) {
+    state.summary[t.dataset.platform][t.dataset.kpi] = t.textContent; return;
+  }
+  const tr = t.closest('table.creative-table tr');
+  if (tr) {
+    const platform = tr.closest('table').dataset.platform;
+    const idx = parseInt(tr.dataset.idx, 10);
+    const field = t.dataset.field;
+    if (field) state.rows[platform][idx][field] = t.textContent || t.value;
+  }
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.matches('.format-select')) {
+    const tr = e.target.closest('tr');
+    const platform = tr.closest('table').dataset.platform;
+    const idx = parseInt(tr.dataset.idx, 10);
+    state.rows[platform][idx].format = e.target.value;
+  }
+});
+
+// ---------- Row actions ----------
+window.deleteRow = async (platform, idx) => {
+  if (!(await customConfirm('Delete this row?'))) return;
+  state.rows[platform].splice(idx, 1);
+  renderRows(platform);
+};
+window.editLink = async (platform, idx) => {
+  const current = state.rows[platform][idx].assetLink || '';
+  const url = await customPrompt('Enter URL for this asset (leave empty to remove link):', current);
+  if (url === null) return;
+  state.rows[platform][idx].assetLink = url.trim();
+  if (url.trim() && !state.rows[platform][idx].assetName) {
+    const name = (await customPrompt('Display name for this asset:', '')) || 'Untitled';
+    state.rows[platform][idx].assetName = name;
+  }
+  renderRows(platform);
+};
+window.editName = async (platform, idx) => {
+  const current = state.rows[platform][idx].assetName || '';
+  const name = await customPrompt('Asset name:', current);
+  if (name === null) return;
+  state.rows[platform][idx].assetName = name;
+  renderRows(platform);
+};
+
+// ---------- Add row ----------
+document.querySelectorAll('.add-row-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.rows[btn.dataset.platform].push(blankRow());
+    renderRows(btn.dataset.platform);
+  });
+});
+
+// ---------- Drop zones ----------
+document.querySelectorAll('.drop-zone').forEach(zone => {
+  const platform = zone.dataset.platform;
+  const input = zone.querySelector('input[type="file"]');
+
+  zone.addEventListener('click', (e) => {
+    if (e.target.matches('.clear-btn')) return;
+    input.click();
+  });
+  input.addEventListener('change', (e) => {
+    if (e.target.files.length) ingestCSV(platform, e.target.files[0]);
+  });
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault(); zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.toLowerCase().endsWith('.csv')) {
+      ingestCSV(platform, file);
+    } else {
+      const status = zone.querySelector('.drop-status');
+      status.classList.add('error');
+      status.textContent = 'Please drop a .csv file';
+    }
+  });
+});
+
+// Delegated click handler — robust to attachment timing & DOM state
+document.addEventListener('click', async (e) => {
+  // Asset-name link → open in a new tab (explicit window.open avoids iframe target="_blank" quirks)
+  const assetLink = e.target.closest('.asset-link');
+  if (assetLink && assetLink.href) {
+    e.preventDefault();
+    e.stopPropagation();
+    window.open(assetLink.href, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  // Clear single platform's data (✕ button on drop zone)
+  const clearBtn = e.target.closest('.clear-btn');
+  if (clearBtn) {
+    e.stopPropagation();
+    e.preventDefault();
+    const platform = clearBtn.dataset.clear;
+    if (await customConfirm(`Clear ${PLATFORM_LABELS[platform]} data?`)) {
+      clearPlatform(platform);
+    }
+    return;
+  }
+
+  // Reset entire template
+  if (e.target.closest('#resetBtn')) {
+    if (!(await customConfirm('Reset all data back to a blank template? This cannot be undone.'))) return;
+    state = defaultState();
+    ['meta','tiktok','snap'].forEach(p => {
+      document.querySelector(`.drop-zone[data-platform="${p}"]`).classList.remove('has-data');
+      document.querySelector(`[data-status="${p}"]`).textContent = '';
+      document.querySelector(`input[data-input="${p}"]`).value = '';
+    });
+    document.getElementById('sortMetric').value = 'conversions';
+    renderAll();
+    return;
+  }
+});
+
+// ---------- Sort metric change ----------
+function updateColumnHighlight() {
+  document.querySelectorAll('table.creative-table').forEach(t => {
+    t.dataset.highlight = state.sortMetric;
+  });
+}
+document.getElementById('sortMetric').addEventListener('change', (e) => {
+  state.sortMetric = e.target.value;
+  ['meta','tiktok','snap'].forEach(p => {
+    if (state.rawData[p]) rebuildTopFive(p);
+  });
+  updateColumnHighlight();
+  renderAll();
+});
+
+// ---------- Toolbar ----------
+function updateToggleLabels() {
+  const inEdit = document.body.classList.contains('edit-mode');
+  document.getElementById('toggleMode').textContent = inEdit ? '👁 Switch to Client View' : '✎ Switch to Edit Mode';
+  document.getElementById('floatingToggle').textContent = inEdit ? '👁 Client View' : '✎ Edit Mode';
+}
+document.getElementById('toggleMode').addEventListener('click', () => {
+  document.body.classList.toggle('edit-mode');
+  updateToggleLabels();
+});
+document.getElementById('floatingToggle').addEventListener('click', () => {
+  document.body.classList.toggle('edit-mode');
+  updateToggleLabels();
+});
+
+// (resetBtn is handled by the delegated click handler above)
+
+updateColumnHighlight();
+renderAll();
+</script>
+</body>
+</html>
